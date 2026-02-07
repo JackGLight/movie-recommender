@@ -1,44 +1,57 @@
 {% if movies|length == 0 %}
-<p class="muted">No results. Try loosening filters.</p>
+  <p class="muted">No results. Try loosening filters.</p>
 {% else %}
-<p class="muted">Showing {{ movies|length }} movies (page 1).</p>
-<div class="grid">
+  <p class="muted">Showing {{ movies|length }} movies (page 1).</p>
+
+  <div class="grid">
     {% for m in movies %}
-    <div class="card">
+      <div class="card">
+
+        <!-- 🎬 Poster -->
+        {% if m.poster_path %}
+          <img
+            src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}"
+            alt="{{ m.title }} poster"
+            style="width:100%; border-radius:10px; margin-bottom:10px;"
+            loading="lazy"
+          >
+        {% endif %}
+
         <div><strong>{{ m.title }}</strong></div>
 
         <div class="muted">
-            {{ (m.release_date or "")[:4] }} · ⭐ {{ m.vote_average }} ({{ m.vote_count }})
+          {{ (m.release_date or "")[:4] }} · ⭐ {{ m.vote_average }} ({{ m.vote_count }})
         </div>
 
         <!-- 🔹 Dog safety badge -->
         <p class="muted">
-            Dog safety:
-            {% if m.dtdd_dog_safe == "safe" %}
+          No dogs harmed:
+          {% if m.dtdd_dog_safe == "safe" %}
             <strong style="color: green;">Safe</strong>
-            {% elif m.dtdd_dog_safe == "unsafe" %}
+          {% elif m.dtdd_dog_safe == "unsafe" %}
             <strong style="color: red;">Unsafe</strong>
-            {% else %}
+          {% else %}
             <strong style="color: gray;">Unknown</strong>
-            {% endif %}
+          {% endif %}
         </p>
 
+        <!-- ✅ Watched -->
         {% if m.is_watched %}
-        <p class="muted"><strong>Watched ✅</strong></p>
+          <p class="muted"><strong>Watched ✅</strong></p>
         {% else %}
-        <form method="post" action="/watched">
+          <form method="post" action="/watched">
             <input type="hidden" name="tmdb_id" value="{{ m.id }}">
             <input type="hidden" name="title" value="{{ m.title }}">
             <button type="submit">Mark watched</button>
-        </form>
+          </form>
         {% endif %}
 
-
         <p class="muted">
-            {{ (m.overview or "")[:180] }}
-            {% if (m.overview or "")|length > 180 %}…{% endif %}
+          {{ (m.overview or "")[:180] }}
+          {% if (m.overview or "")|length > 180 %}…{% endif %}
         </p>
-    </div>
+
+      </div>
     {% endfor %}
-</div>
+  </div>
 {% endif %}
