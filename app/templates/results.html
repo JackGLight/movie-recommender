@@ -3,6 +3,10 @@
 {% else %}
 <p class="muted">Showing {{ movies|length }} movies (page 1).</p>
 
+{% if results_note %}
+<p class="muted"><em>{{ results_note }}</em></p>
+{% endif %}
+
 <div class="grid">
   {% for m in movies %}
   <div class="card">

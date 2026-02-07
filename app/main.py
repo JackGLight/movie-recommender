@@ -12,7 +12,7 @@ from app.movies.dtdd import is_animal_safe_v1
 from app.movies.genres import fetch_genres
 from app.movies.ranking import rank_movies
 from app.movies.tmdb import (
-    discover_movies,
+    discover_movies_multi,   # ✅ use multi-page helper
     search_person_id,
     get_movie_cast_ids,
     get_imdb_id,
@@ -50,7 +50,6 @@ def watched(request: Request):
 
 @app.get("/movie/{tmdb_id}")
 def movie_detail(request: Request, tmdb_id: int):
-    # Fetch full movie details
     movie = get_movie_details(TMDB_API_KEY, tmdb_id)
 
     # Credits (cast)
@@ -89,8 +88,6 @@ def movie_detail(request: Request, tmdb_id: int):
         db.close()
 
     movie["is_watched"] = watched is not None
-
-    # Limit cast list size for display
     cast = cast[:12]
 
     return templates.TemplateResponse(
@@ -118,7 +115,6 @@ def mark_watched(
     finally:
         db.close()
 
-    # ✅ If HTMX, return ONLY the watched snippet so it swaps into the card
     if request.headers.get("hx-request") == "true":
         return HTMLResponse(
             f"""
@@ -136,7 +132,6 @@ def mark_watched(
             """
         )
 
-    # Non-HTMX fallback
     return RedirectResponse(url="/watched", status_code=303)
 
 
@@ -156,7 +151,6 @@ def remove_watched(
     finally:
         db.close()
 
-    # ✅ If HTMX, return ONLY the "Mark watched" snippet
     if request.headers.get("hx-request") == "true":
         return HTMLResponse(
             f"""
@@ -173,7 +167,6 @@ def remove_watched(
             """
         )
 
-    # Non-HTMX fallback
     return RedirectResponse(url="/watched", status_code=303)
 
 
@@ -188,7 +181,6 @@ def search(
     exclude_actors: str | None = Form(default=None),
     no_animal_harm: str | None = Form(default=None),
 ):
-    # checkbox sends "on" when checked, None when not
     no_animal_harm = bool(no_animal_harm)
 
     def split_names(s: str | None) -> list[str]:
@@ -207,18 +199,6 @@ def search(
 
     with_cast_csv = ",".join(str(i) for i in include_ids) if include_ids else None
 
-    data = discover_movies(
-        TMDB_API_KEY,
-        year_from=year_from,
-        year_to=year_to,
-        min_vote=min_vote,
-        genres_csv=genres_csv,
-        with_cast_csv=with_cast_csv,
-        page=1,
-    )
-
-    movies = data.get("results", [])
-
     # --- watched IDs for MVP user_id=1 ---
     db = SessionLocal()
     try:
@@ -229,8 +209,59 @@ def search(
     finally:
         db.close()
 
-    # NOTE: you currently filter watched movies out completely:
-    movies = [m for m in movies if m.get("id") not in watched_ids]
+    SORT_BY = "vote_count.desc"
+
+    # -------------------------
+    # Option B: fallback ladder
+    # -------------------------
+    # What "enough" means for you
+    MIN_RESULTS_TARGET = 20
+
+    # Expand pages when filters are strict
+    pages = 5
+    if min_vote is not None and min_vote >= 8.0:
+        pages = 10
+
+    # Build attempts (strict -> loose)
+    attempts: list[tuple[float | None, int, str | None]] = [
+        (min_vote, 200, None),
+        (min_vote, 100, "Too few results — lowered minimum review count to 100."),
+        (min_vote, 50,  "Too few results — lowered minimum review count to 50."),
+    ]
+
+    # If they set a super-high rating, allow rating fallback too
+    if min_vote is not None and min_vote >= 8.5:
+        attempts += [
+            (8.0, 100, "Too few results at 8.5+ — showing 8.0+ with at least 100 reviews."),
+            (7.5, 100, "Still too few — showing 7.5+ with at least 100 reviews."),
+        ]
+
+    movies: list[dict] = []
+    results_note: str | None = None
+
+    for mv, mvc, note in attempts:
+        movies = discover_movies_multi(
+            TMDB_API_KEY,
+            year_from=year_from,
+            year_to=year_to,
+            min_vote=mv,
+            min_vote_count=mvc,
+            genres_csv=genres_csv,
+            with_cast_csv=with_cast_csv,
+            pages=pages,
+            sort_by=SORT_BY,
+        )
+
+        # Remove watched movies from results
+        movies = [m for m in movies if m.get("id") not in watched_ids]
+
+        # If we have enough, stop here
+        if len(movies) >= MIN_RESULTS_TARGET:
+            results_note = note
+            break
+
+        # Otherwise try next fallback
+        results_note = note
 
     # --- DTDD: annotate + optionally filter unsafe dogs ---
     MAX_DTDD_CHECK = 25
@@ -248,8 +279,6 @@ def search(
 
         safe = is_animal_safe_v1(DTDD_API_KEY, m, imdb_id=imdb)
 
-        # this will always be False now since we removed watched movies above,
-        # but it's harmless and keeps the template consistent
         m["is_watched"] = (m.get("id") in watched_ids)
 
         if safe is True:
@@ -296,5 +325,5 @@ def search(
 
     return templates.TemplateResponse(
         "results.html",
-        {"request": request, "movies": movies},
+        {"request": request, "movies": movies, "results_note": results_note},
     )
