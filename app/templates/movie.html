@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>{{ movie.title }}</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            margin: 24px;
+        }
+
+        .muted {
+            color: #666;
+        }
+
+        .wrap {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+        }
+
+        img {
+            border-radius: 10px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+        .safe {
+            background: #e7f7ee;
+            color: #137a3b;
+        }
+
+        .unsafe {
+            background: #fde8e8;
+            color: #b42318;
+        }
+
+        .unknown {
+            background: #f2f2f2;
+            color: #444;
+        }
+
+        .cast {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .cast .person {
+            padding: 6px 10px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        a {
+            color: inherit;
+        }
+    </style>
+</head>
+
+<body>
+    <p>
+        <a href="#"
+            onclick="if (history.length > 1) { history.back(); } else { window.location.href = '/'; } return false;">
+            ← Back to results
+        </a>
+    </p>
+
+    <h1>{{ movie.title }}</h1>
+
+    <p class="muted">
+        {{ (movie.release_date or "")[:4] }}
+        {% if movie.vote_average is not none %}
+        · ⭐ {{ movie.vote_average }} ({{ movie.vote_count }})
+        {% endif %}
+    </p>
+
+    <div class="wrap">
+        {% if movie.poster_path %}
+        <img src="https://image.tmdb.org/t/p/w342{{ movie.poster_path }}" alt="{{ movie.title }} poster" width="260" />
+        {% endif %}
+
+        <div>
+            <p>
+                Dog safety:
+                {% if movie.dtdd_dog_safe == "safe" %}
+                <span class="pill safe">Safe</span>
+                {% elif movie.dtdd_dog_safe == "unsafe" %}
+                <span class="pill unsafe">Unsafe</span>
+                {% else %}
+                <span class="pill unknown">Unknown</span>
+                {% endif %}
+            </p>
+
+            {% if movie.is_watched %}
+            <p class="muted"><strong>Watched ✅</strong></p>
+            <form method="post" action="/watched/remove" style="display:inline;">
+                <input type="hidden" name="tmdb_id" value="{{ movie.id }}">
+                <button type="submit">Remove from watched</button>
+            </form>
+            {% else %}
+            <form method="post" action="/watched" style="display:inline;">
+                <input type="hidden" name="tmdb_id" value="{{ movie.id }}">
+                <input type="hidden" name="title" value="{{ movie.title }}">
+                <button type="submit">Mark watched</button>
+            </form>
+            {% endif %}
+
+            <h3>Overview</h3>
+            <p>{{ movie.overview or "No overview available." }}</p>
+
+            {% if cast and cast|length > 0 %}
+            <h3>Top cast</h3>
+            <div class="cast">
+                {% for c in cast %}
+                <div class="person">
+                    <div><strong>{{ c.name }}</strong></div>
+                    <div class="muted">{{ c.character }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+
+</html>

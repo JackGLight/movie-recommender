@@ -4,6 +4,20 @@ import requests
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 
+def get_movie_details(api_key: str, tmdb_id: int) -> dict:
+    url = f"{TMDB_BASE}/movie/{tmdb_id}"
+    r = requests.get(url, params={"api_key": api_key})
+    r.raise_for_status()
+    return r.json()
+
+
+def get_movie_credits(api_key: str, tmdb_id: int) -> dict:
+    url = f"{TMDB_BASE}/movie/{tmdb_id}/credits"
+    r = requests.get(url, params={"api_key": api_key})
+    r.raise_for_status()
+    return r.json()
+
+
 def discover_movies(
     api_key: str,
     *,

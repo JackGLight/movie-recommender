@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
+from app.movies.tmdb import get_movie_details, get_movie_credits
 
 from app.config import TMDB_API_KEY, DTDD_API_KEY
 from app.db import engine, SessionLocal
@@ -37,6 +39,50 @@ def watched(request: Request):
         db.close()
 
     return templates.TemplateResponse("watched.html", {"request": request, "rows": rows})
+
+@app.get("/movie/{tmdb_id}")
+def movie_detail(request: Request, tmdb_id: int):
+    # Fetch full movie details
+    movie = get_movie_details(TMDB_API_KEY, tmdb_id)
+
+    # Credits (cast)
+    credits = {}
+    cast = []
+    try:
+        credits = get_movie_credits(TMDB_API_KEY, tmdb_id)
+        cast = credits.get("cast") or []
+    except Exception as e:
+        print(f"[WARN] credits failed for {tmdb_id}: {e}")
+        cast = []
+
+    # Dog safety (DTDD)
+    imdb = None
+    try:
+        imdb = get_imdb_id(TMDB_API_KEY, tmdb_id)  # you already have this helper
+    except Exception as e:
+        print(f"[WARN] imdb lookup failed for {tmdb_id}: {e}")
+
+    safe = is_animal_safe_v1(DTDD_API_KEY, movie, imdb_id=imdb)
+    if safe is True:
+        movie["dtdd_dog_safe"] = "safe"
+    elif safe is False:
+        movie["dtdd_dog_safe"] = "unsafe"
+    else:
+        movie["dtdd_dog_safe"] = "unknown"
+
+    # Watched state (for user_id=1 MVP)
+    db = SessionLocal()
+    watched = db.query(WatchedMovie).filter_by(user_id=1, tmdb_id=tmdb_id).first()
+    db.close()
+    movie["is_watched"] = watched is not None
+
+    # Limit cast list size for display
+    cast = cast[:12]
+
+    return templates.TemplateResponse(
+        "movie.html",
+        {"request": request, "movie": movie, "cast": cast},
+    )
 
 
 @app.post("/watched")
