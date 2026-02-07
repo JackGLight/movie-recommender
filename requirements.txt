@@ -21,4 +21,4 @@ urllib3==2.6.3
 uvicorn==0.40.0
 
 # Add the missing dependency — pin the version
-SQLAlchemy==2.0.28
+SQLAlchemy==2.0.38
