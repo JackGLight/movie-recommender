@@ -2,148 +2,147 @@
 <html>
 
 <head>
-  <meta charset="utf-8" />
-  <title>Movie Recommender</title>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, Arial;
-      margin: 24px;
-    }
+    <meta charset="utf-8" />
+    <title>Movie Recommender</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Arial;
+            margin: 24px;
+        }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
-    }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+        }
 
-    .card {
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      padding: 12px;
-    }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 12px;
+        }
 
-    .muted {
-      color: #666;
-      font-size: 14px;
-    }
+        .muted {
+            color: #666;
+            font-size: 14px;
+        }
 
-    input,
-    select {
-      padding: 8px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-    }
+        input,
+        select {
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
 
-    button {
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 0;
-      cursor: pointer;
-    }
+        button {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: pointer;
+        }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: end;
-      margin-bottom: 14px;
-    }
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-bottom: 14px;
+        }
 
-    label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 14px;
-    }
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 14px;
+        }
 
-    /* HTMX loading indicator: hidden by default, visible during request */
-    .htmx-indicator {
-      display: none;
-    }
+        /* HTMX loading indicator: hidden by default, visible during request */
+        .htmx-indicator {
+            display: none;
+        }
 
-    .htmx-request.htmx-indicator {
-      display: inline;
-    }
-  </style>
+        .htmx-request.htmx-indicator {
+            display: inline;
+        }
+    </style>
 </head>
 
 <body>
-  <h1>Movie Recommender</h1>
-  <p class="muted">Set your filters, then press Search.</p>
+    <h1>Movie Recommender</h1>
+    <p class="muted">Set your filters, then press Search.</p>
+    <p class="muted">
+        <a href="/watched">View watched</a>
+    </p>
 
-  <form class="row"
-        hx-post="/search"
-        hx-target="#results"
-        hx-trigger="submit"
-        hx-indicator="#loading">
-    <label>
-      Year from
-      <input type="number" name="year_from" placeholder="1990" min="1870" max="2100">
-    </label>
+    <form class="row" hx-post="/search" hx-target="#results" hx-trigger="submit" hx-indicator="#loading">
+        <label>
+            Year from
+            <input type="number" name="year_from" placeholder="1990" min="1870" max="2100">
+        </label>
 
-    <label>
-      Year to
-      <input type="number" name="year_to" placeholder="2026" min="1870" max="2100">
-    </label>
+        <label>
+            Year to
+            <input type="number" name="year_to" placeholder="2026" min="1870" max="2100">
+        </label>
 
-    <label>
-      Min rating
-      <input type="number" name="min_vote" placeholder="7.0" step="0.1" min="0" max="10">
-    </label>
+        <label>
+            Min rating
+            <input type="number" name="min_vote" placeholder="7.0" step="0.1" min="0" max="10">
+        </label>
 
-    <label>
-      Genre
-      <select name="genres_csv">
-        <option value="">Any</option>
-        {% for g in (genres or []) %}
-          <option value="{{ g.id }}">{{ g.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+        <label>
+            Genre
+            <select name="genres_csv">
+                <option value="">Any</option>
+                {% for g in (genres or []) %}
+                <option value="{{ g.id }}">{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
 
-    <label>
-      Include actor(s)
-      <input type="text" name="include_actors" placeholder="Tom Hanks, Meryl Streep">
-    </label>
+        <label>
+            Include actor(s)
+            <input type="text" name="include_actors" placeholder="Tom Hanks, Meryl Streep">
+        </label>
 
-    <label>
-      Exclude actor(s)
-      <input type="text" name="exclude_actors" placeholder="Cameron Diaz, ...">
-    </label>
+        <label>
+            Exclude actor(s)
+            <input type="text" name="exclude_actors" placeholder="Cameron Diaz, ...">
+        </label>
 
-    <label style="flex-direction: row; align-items: center; gap: 10px;">
-      <input type="checkbox" name="no_animal_harm" value="1">
-      No animals harmed
-    </label>
+        <label style="flex-direction: row; align-items: center; gap: 10px;">
+            <input type="checkbox" name="no_animal_harm" value="1">
+            No animals harmed
+        </label>
 
-    <div style="display:flex; align-items:center; gap:10px;">
-      <button id="searchBtn" type="submit">Search</button>
-      <span id="loading" class="muted htmx-indicator">Searching…</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button id="searchBtn" type="submit">Search</button>
+            <span id="loading" class="muted htmx-indicator">Searching…</span>
+        </div>
+    </form>
+
+    <div id="results">
+        <p class="muted">Results will appear here.</p>
     </div>
-  </form>
 
-  <div id="results">
-    <p class="muted">Results will appear here.</p>
-  </div>
+    <script>
+        // Optional UX polish: disable the button while searching to prevent double submits
+        const form = document.querySelector("form.row");
+        const btn = document.getElementById("searchBtn");
 
-  <script>
-    // Optional UX polish: disable the button while searching to prevent double submits
-    const form = document.querySelector("form.row");
-    const btn = document.getElementById("searchBtn");
+        form.addEventListener("submit", () => {
+            btn.disabled = true;
+            btn.textContent = "Searching…";
+        });
 
-    form.addEventListener("submit", () => {
-      btn.disabled = true;
-      btn.textContent = "Searching…";
-    });
-
-    document.body.addEventListener("htmx:afterRequest", (evt) => {
-      if (evt.target === form) {
-        btn.disabled = false;
-        btn.textContent = "Search";
-      }
-    });
-  </script>
+        document.body.addEventListener("htmx:afterRequest", (evt) => {
+            if (evt.target === form) {
+                btn.disabled = false;
+                btn.textContent = "Search";
+            }
+        });
+    </script>
 </body>
 
 </html>

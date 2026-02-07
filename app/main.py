@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+
 from app.movies.tmdb import get_movie_details, get_movie_credits
 
 from app.config import TMDB_API_KEY, DTDD_API_KEY
@@ -28,7 +28,11 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/")
 def home(request: Request):
     genres = fetch_genres(TMDB_API_KEY)
-    return templates.TemplateResponse("search.html", {"request": request, "genres": genres})
+    return templates.TemplateResponse(
+        "search.html",
+        {"request": request, "genres": genres},
+    )
+
 
 @app.get("/watched")
 def watched(request: Request):
@@ -38,7 +42,11 @@ def watched(request: Request):
     finally:
         db.close()
 
-    return templates.TemplateResponse("watched.html", {"request": request, "rows": rows})
+    return templates.TemplateResponse(
+        "watched.html",
+        {"request": request, "rows": rows},
+    )
+
 
 @app.get("/movie/{tmdb_id}")
 def movie_detail(request: Request, tmdb_id: int):
@@ -46,7 +54,6 @@ def movie_detail(request: Request, tmdb_id: int):
     movie = get_movie_details(TMDB_API_KEY, tmdb_id)
 
     # Credits (cast)
-    credits = {}
     cast = []
     try:
         credits = get_movie_credits(TMDB_API_KEY, tmdb_id)
@@ -58,7 +65,7 @@ def movie_detail(request: Request, tmdb_id: int):
     # Dog safety (DTDD)
     imdb = None
     try:
-        imdb = get_imdb_id(TMDB_API_KEY, tmdb_id)  # you already have this helper
+        imdb = get_imdb_id(TMDB_API_KEY, tmdb_id)
     except Exception as e:
         print(f"[WARN] imdb lookup failed for {tmdb_id}: {e}")
 
@@ -72,8 +79,15 @@ def movie_detail(request: Request, tmdb_id: int):
 
     # Watched state (for user_id=1 MVP)
     db = SessionLocal()
-    watched = db.query(WatchedMovie).filter_by(user_id=1, tmdb_id=tmdb_id).first()
-    db.close()
+    try:
+        watched = (
+            db.query(WatchedMovie)
+            .filter_by(user_id=1, tmdb_id=tmdb_id)
+            .first()
+        )
+    finally:
+        db.close()
+
     movie["is_watched"] = watched is not None
 
     # Limit cast list size for display
@@ -87,6 +101,7 @@ def movie_detail(request: Request, tmdb_id: int):
 
 @app.post("/watched")
 def mark_watched(
+    request: Request,
     tmdb_id: int = Form(...),
     title: str = Form(...),
 ):
@@ -102,20 +117,63 @@ def mark_watched(
             db.commit()
     finally:
         db.close()
+
+    # ✅ If HTMX, return ONLY the watched snippet so it swaps into the card
+    if request.headers.get("hx-request") == "true":
+        return HTMLResponse(
+            f"""
+            <div id="watched-{tmdb_id}">
+              <p class="muted"><strong>Watched ✅</strong></p>
+              <form hx-post="/watched/remove"
+                    hx-target="#watched-{tmdb_id}"
+                    hx-swap="outerHTML"
+                    style="margin:0;">
+                <input type="hidden" name="tmdb_id" value="{tmdb_id}">
+                <input type="hidden" name="title" value="{title}">
+                <button type="submit">Undo</button>
+              </form>
+            </div>
+            """
+        )
+
+    # Non-HTMX fallback
     return RedirectResponse(url="/watched", status_code=303)
 
+
 @app.post("/watched/remove")
-def remove_watched(tmdb_id: int = Form(...)):
+def remove_watched(
+    request: Request,
+    tmdb_id: int = Form(...),
+    title: str = Form(...),
+):
     db = SessionLocal()
     try:
         db.query(WatchedMovie).filter(
             WatchedMovie.user_id == 1,
-            WatchedMovie.tmdb_id == tmdb_id
+            WatchedMovie.tmdb_id == tmdb_id,
         ).delete()
         db.commit()
     finally:
         db.close()
 
+    # ✅ If HTMX, return ONLY the "Mark watched" snippet
+    if request.headers.get("hx-request") == "true":
+        return HTMLResponse(
+            f"""
+            <div id="watched-{tmdb_id}">
+              <form hx-post="/watched"
+                    hx-target="#watched-{tmdb_id}"
+                    hx-swap="outerHTML"
+                    style="margin:0;">
+                <input type="hidden" name="tmdb_id" value="{tmdb_id}">
+                <input type="hidden" name="title" value="{title}">
+                <button type="submit">Mark watched</button>
+              </form>
+            </div>
+            """
+        )
+
+    # Non-HTMX fallback
     return RedirectResponse(url="/watched", status_code=303)
 
 
@@ -160,7 +218,8 @@ def search(
     )
 
     movies = data.get("results", [])
-    # --- Filter out watched movies (MVP: single user_id=1) ---
+
+    # --- watched IDs for MVP user_id=1 ---
     db = SessionLocal()
     try:
         watched_ids = {
@@ -170,6 +229,7 @@ def search(
     finally:
         db.close()
 
+    # NOTE: you currently filter watched movies out completely:
     movies = [m for m in movies if m.get("id") not in watched_ids]
 
     # --- DTDD: annotate + optionally filter unsafe dogs ---
@@ -188,6 +248,8 @@ def search(
 
         safe = is_animal_safe_v1(DTDD_API_KEY, m, imdb_id=imdb)
 
+        # this will always be False now since we removed watched movies above,
+        # but it's harmless and keeps the template consistent
         m["is_watched"] = (m.get("id") in watched_ids)
 
         if safe is True:
@@ -198,13 +260,13 @@ def search(
             m["dtdd_dog_safe"] = "unknown"
 
         if no_animal_harm and safe is False:
-            continue  # filter out unsafe
+            continue
 
         checked.append(m)
 
-    # mark unchecked ones as unknown so template is predictable
     for m in movies[MAX_DTDD_CHECK:]:
         m.setdefault("dtdd_dog_safe", "unknown")
+        m["is_watched"] = (m.get("id") in watched_ids)
 
     movies = checked + movies[MAX_DTDD_CHECK:]
 
@@ -230,7 +292,9 @@ def search(
 
         movies = filtered
 
-    # --- Rank results ---
     movies = rank_movies(movies)
 
-    return templates.TemplateResponse("results.html", {"request": request, "movies": movies})
+    return templates.TemplateResponse(
+        "results.html",
+        {"request": request, "movies": movies},
+    )

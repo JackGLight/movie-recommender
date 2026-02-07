@@ -4,54 +4,71 @@
 <p class="muted">Showing {{ movies|length }} movies (page 1).</p>
 
 <div class="grid">
-    {% for m in movies %}
-    <div class="card">
+  {% for m in movies %}
+  <div class="card">
 
-        <!-- 🎬 Poster -->
-        {% if m.poster_path %}
-        <img src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}" alt="{{ m.title }} poster"
-            style="width:100%; border-radius:10px; margin-bottom:10px;" loading="lazy">
-        {% endif %}
+    <!-- 🎬 Poster -->
+    {% if m.poster_path %}
+    <img src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}"
+         alt="{{ m.title }} poster"
+         style="width:100%; border-radius:10px; margin-bottom:10px;"
+         loading="lazy">
+    {% endif %}
 
-        <div>
-            <strong>
-                <a href="/movie/{{ m.id }}">{{ m.title }}</a>
-            </strong>
-        </div>
-
-        <div class="muted">
-            {{ (m.release_date or "")[:4] }} · ⭐ {{ m.vote_average }} ({{ m.vote_count }})
-        </div>
-
-        <!-- 🔹 Dog safety badge -->
-        <p class="muted">
-            No dogs harmed:
-            {% if m.dtdd_dog_safe == "safe" %}
-            <strong style="color: green;">Safe</strong>
-            {% elif m.dtdd_dog_safe == "unsafe" %}
-            <strong style="color: red;">Unsafe</strong>
-            {% else %}
-            <strong style="color: gray;">Unknown</strong>
-            {% endif %}
-        </p>
-
-        <!-- ✅ Watched -->
-        {% if m.is_watched %}
-        <p class="muted"><strong>Watched ✅</strong></p>
-        {% else %}
-        <form method="post" action="/watched">
-            <input type="hidden" name="tmdb_id" value="{{ m.id }}">
-            <input type="hidden" name="title" value="{{ m.title }}">
-            <button type="submit">Mark watched</button>
-        </form>
-        {% endif %}
-
-        <p class="muted">
-            {{ (m.overview or "")[:180] }}
-            {% if (m.overview or "")|length > 180 %}…{% endif %}
-        </p>
-
+    <div>
+      <strong>
+        <a href="/movie/{{ m.id }}">{{ m.title }}</a>
+      </strong>
     </div>
-    {% endfor %}
+
+    <div class="muted">
+      {{ (m.release_date or "")[:4] }} · ⭐ {{ m.vote_average }} ({{ m.vote_count }})
+    </div>
+
+    <!-- 🔹 Dog safety badge -->
+    <p class="muted">
+      No dogs harmed:
+      {% if m.dtdd_dog_safe == "safe" %}
+        <strong style="color: green;">Safe</strong>
+      {% elif m.dtdd_dog_safe == "unsafe" %}
+        <strong style="color: red;">Unsafe</strong>
+      {% else %}
+        <strong style="color: gray;">Unknown</strong>
+      {% endif %}
+    </p>
+
+    <!-- ✅ Watched (HTMX inline toggle) -->
+    <div id="watched-{{ m.id }}">
+      {% if m.is_watched %}
+        <p class="muted"><strong>Watched ✅</strong></p>
+
+        <!-- Optional undo (inline) -->
+        <form hx-post="/watched/remove"
+              hx-target="#watched-{{ m.id }}"
+              hx-swap="outerHTML"
+              style="margin:0;">
+          <input type="hidden" name="tmdb_id" value="{{ m.id }}">
+          <input type="hidden" name="title" value="{{ m.title }}">
+          <button type="submit">Undo</button>
+        </form>
+      {% else %}
+        <form hx-post="/watched"
+              hx-target="#watched-{{ m.id }}"
+              hx-swap="outerHTML"
+              style="margin:0;">
+          <input type="hidden" name="tmdb_id" value="{{ m.id }}">
+          <input type="hidden" name="title" value="{{ m.title }}">
+          <button type="submit">Mark watched</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <p class="muted">
+      {{ (m.overview or "")[:180] }}
+      {% if (m.overview or "")|length > 180 %}…{% endif %}
+    </p>
+
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
