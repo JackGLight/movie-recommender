@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Movie Recommender</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Arial;
+            margin: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 14px;
+        }
+
+        input {
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: pointer;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Movie Recommender</h1>
+    <p class="muted">Filters are live. Next we’ll add genre, actors include/exclude, and “no animal harm”.</p>
+
+    <form class="row" hx-post="/search" hx-target="#results"
+        hx-trigger="submit, change delay:400ms, keyup changed delay:500ms">
+        <label>
+            Year from
+            <input type="number" name="year_from" placeholder="1990" min="1870" max="2100">
+        </label>
+        <label>
+            Year to
+            <input type="number" name="year_to" placeholder="2026" min="1870" max="2100">
+        </label>
+        <label>
+            Min rating
+            <input type="number" name="min_vote" placeholder="7.0" step="0.1" min="0" max="10">
+        </label>
+        <label>
+            Genre
+            <select name="genres_csv">
+                <option value="">Any</option>
+                {% for g in (genres or []) %}
+                <option value="{{ g.id }}">{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Include actor(s)
+            <input type="text" name="include_actors" placeholder="Tom Hanks, Meryl Streep">
+        </label>
+
+        <label>
+            Exclude actor(s)
+            <input type="text" name="exclude_actors" placeholder="Cameron Diaz, ...">
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 10px;">
+            <input type="checkbox" name="no_animal_harm" value="1">
+            No animals harmed
+        </label>
+
+
+        <button type="submit">Search</button>
+    </form>
+
+    <div id="results">
+        <p class="muted">Results will appear here.</p>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,44 @@
+{% if movies|length == 0 %}
+<p class="muted">No results. Try loosening filters.</p>
+{% else %}
+<p class="muted">Showing {{ movies|length }} movies (page 1).</p>
+<div class="grid">
+    {% for m in movies %}
+    <div class="card">
+        <div><strong>{{ m.title }}</strong></div>
+
+        <div class="muted">
+            {{ (m.release_date or "")[:4] }} · ⭐ {{ m.vote_average }} ({{ m.vote_count }})
+        </div>
+
+        <!-- 🔹 Dog safety badge -->
+        <p class="muted">
+            Dog safety:
+            {% if m.dtdd_dog_safe == "safe" %}
+            <strong style="color: green;">Safe</strong>
+            {% elif m.dtdd_dog_safe == "unsafe" %}
+            <strong style="color: red;">Unsafe</strong>
+            {% else %}
+            <strong style="color: gray;">Unknown</strong>
+            {% endif %}
+        </p>
+
+        {% if m.is_watched %}
+        <p class="muted"><strong>Watched ✅</strong></p>
+        {% else %}
+        <form method="post" action="/watched">
+            <input type="hidden" name="tmdb_id" value="{{ m.id }}">
+            <input type="hidden" name="title" value="{{ m.title }}">
+            <button type="submit">Mark watched</button>
+        </form>
+        {% endif %}
+
+
+        <p class="muted">
+            {{ (m.overview or "")[:180] }}
+            {% if (m.overview or "")|length > 180 %}…{% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

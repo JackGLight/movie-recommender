@@ -1,0 +1,13 @@
+# Virtual environments
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local database
+movies.db
+
+# OS junk
+.DS_Store

@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>Watched</h1>
+    <p><a href="/">Back to search</a></p>
+
+    <ul>
+      {% for w in rows %}
+        <li>
+          {{ w.title }}
+
+          <form method="post" action="/watched/remove" style="display:inline;">
+            <input type="hidden" name="tmdb_id" value="{{ w.tmdb_id }}">
+            <button type="submit">Remove</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
